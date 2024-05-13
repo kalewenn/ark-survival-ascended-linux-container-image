@@ -5,6 +5,10 @@ if [ "$ENABLE_DEBUG" = "1" ]; then
   exit 0
 fi
 
+if [ "$ENABLE_ASAAPI" = "1" ]; then
+  echo "Using AsaApi : true"
+fi
+
 # download steamcmd if necessary
 if [ ! -d "/home/gameserver/steamcmd/linux32" ]; then
   cd /home/gameserver/steamcmd
@@ -39,12 +43,45 @@ if [ ! -d "$ASA_COMPAT_DATA" ]; then
   cp -r $STEAM_COMPAT_DIR/$PROTON_DIR_NAME/files/share/default_pfx $ASA_COMPAT_DATA
 fi
 
-echo "Starting the ARK: Survival Ascended dedicated server..."
-echo "Start parameters: $ASA_START_PARAMS"
 
-export XDG_RUNTIME_DIR=/run/user/$(id -u)
-export STEAM_COMPAT_CLIENT_INSTALL_PATH=/home/gameserver/Steam
-export STEAM_COMPAT_DATA_PATH=$ASA_COMPAT_DATA
+if [ "$ENABLE_ASAAPI" = "1" ]; then
+	## install/update ArkServerAPI
+	echo "Downloading ArkServerAPI..."
+	cd /tmp
+	mkdir -p /tmp/asapi
+	DOWNLOAD_URL=$(curl https://api.github.com/repos/ArkServerApi/AsaApi/releases/latest | jq .assets | jq -r .[].browser_download_url)
+	curl -sSL $DOWNLOAD_URL -o AsaApi.zip
+	unzip AsaApi.zip -d /tmp/asapi
+	if [ -f $ASA_BINARY_DIR/ArkApi/Plugins/Permissions/config.json ]; then
+		mv -f /tmp/asapi/ArkApi/Plugins/Permissions/config.json /tmp/asapi/ArkApi/Plugins/Permissions/config.example.json
+	fi
+	cp -rf /tmp/asapi/* $ASA_BINARY_DIR
 
-cd "$ASA_BINARY_DIR" 
-$STEAM_COMPAT_DIR/$PROTON_DIR_NAME/proton run ArkAscendedServer.exe $ASA_START_PARAMS
+	# cleanup files
+	rm -rf AsaApi.zip
+	
+	
+	echo "Starting the ARK: Survival Ascended dedicated server with AsaApi..."
+	echo "Start parameters: $ASA_START_PARAMS"
+
+	export XDG_RUNTIME_DIR=/run/user/$(id -u)
+	export STEAM_COMPAT_CLIENT_INSTALL_PATH=/home/gameserver/Steam
+	export STEAM_COMPAT_DATA_PATH=$ASA_COMPAT_DATA
+
+	cd "$ASA_BINARY_DIR" 
+	$STEAM_COMPAT_DIR/$PROTON_DIR_NAME/proton run AsaApiLoader.exe $ASA_START_PARAMS
+	
+else
+
+	echo "Starting the ARK: Survival Ascended dedicated server..."
+	echo "Start parameters: $ASA_START_PARAMS"
+
+	export XDG_RUNTIME_DIR=/run/user/$(id -u)
+	export STEAM_COMPAT_CLIENT_INSTALL_PATH=/home/gameserver/Steam
+	export STEAM_COMPAT_DATA_PATH=$ASA_COMPAT_DATA
+
+	cd "$ASA_BINARY_DIR" 
+	$STEAM_COMPAT_DIR/$PROTON_DIR_NAME/proton run ArkAscendedServer.exe $ASA_START_PARAMS
+
+fi
+
